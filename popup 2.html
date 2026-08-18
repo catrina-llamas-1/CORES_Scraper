@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GETTEL Autofill</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #181c27;
+      --border: #262d3d;
+      --border-active: #3a4560;
+      --accent: #4f8ef7;
+      --accent-dim: rgba(79, 142, 247, 0.12);
+      --accent-hover: #6ba3ff;
+      --text: #e2e8f4;
+      --text-muted: #6b7a99;
+      --text-label: #9aaac4;
+      --success-bg: rgba(52, 211, 153, 0.1);
+      --success-border: rgba(52, 211, 153, 0.3);
+      --success-text: #34d399;
+      --warn-bg: rgba(251, 191, 36, 0.1);
+      --warn-border: rgba(251, 191, 36, 0.3);
+      --warn-text: #fbbf24;
+      --error-bg: rgba(248, 113, 113, 0.1);
+      --error-border: rgba(248, 113, 113, 0.3);
+      --error-text: #f87171;
+      --radius: 6px;
+    }
+
+    html, body {
+      width: 300px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 13px;
+    }
+
+    .popup {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-icon {
+      width: 28px;
+      height: 28px;
+      background: var(--accent-dim);
+      border: 1px solid var(--border-active);
+      border-radius: var(--radius);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .header-icon svg {
+      width: 14px;
+      height: 14px;
+      color: var(--accent);
+    }
+
+    .header-text {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .header-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: 0.01em;
+    }
+
+    .header-sub {
+      font-size: 10px;
+      font-family: 'IBM Plex Mono', monospace;
+      color: var(--text-muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    /* Field group */
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field-label {
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-label);
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .select-wrapper {
+      position: relative;
+    }
+
+    .select-wrapper::after {
+      content: '';
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 0;
+      height: 0;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 5px solid var(--text-muted);
+      pointer-events: none;
+    }
+
+    select {
+      width: 100%;
+      appearance: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 13px;
+      padding: 8px 28px 8px 10px;
+      cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      outline: none;
+    }
+
+    select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(79, 142, 247, 0.15);
+    }
+
+    select option {
+      background: #1e2433;
+      color: var(--text);
+    }
+
+    /* Apply button */
+    .btn-apply {
+      width: 100%;
+      padding: 9px 16px;
+      background: var(--accent);
+      border: none;
+      border-radius: var(--radius);
+      color: #fff;
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-apply:hover:not(:disabled) {
+      background: var(--accent-hover);
+      box-shadow: 0 0 12px rgba(79, 142, 247, 0.35);
+    }
+
+    .btn-apply:active:not(:disabled) {
+      transform: scale(0.98);
+    }
+
+    .btn-apply:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .btn-apply.loading {
+      color: transparent;
+    }
+
+    .btn-apply.loading::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      margin: auto;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Status message */
+    .status {
+      display: none;
+      padding: 9px 11px;
+      border-radius: var(--radius);
+      font-size: 12px;
+      line-height: 1.5;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .status.visible { display: block; }
+
+    .status.success {
+      background: var(--success-bg);
+      border: 1px solid var(--success-border);
+      color: var(--success-text);
+    }
+
+    .status.warning {
+      background: var(--warn-bg);
+      border: 1px solid var(--warn-border);
+      color: var(--warn-text);
+    }
+
+    .status.error {
+      background: var(--error-bg);
+      border: 1px solid var(--error-border);
+      color: var(--error-text);
+    }
+
+    .status-detail {
+      margin-top: 5px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      opacity: 0.8;
+      line-height: 1.6;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-3px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Divider */
+    .divider {
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* Footer */
+    .footer {
+      font-size: 10px;
+      font-family: 'IBM Plex Mono', monospace;
+      color: var(--text-muted);
+      text-align: center;
+      padding-top: 2px;
+      letter-spacing: 0.03em;
+    }
+  </style>
+</head>
+<body>
+  <div class="popup">
+
+    <div class="header">
+      <div class="header-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 4h18M3 8h18M3 12h12M3 16h8"/>
+        </svg>
+      </div>
+      <div class="header-text">
+        <div class="header-title">Filter Autofill</div>
+        <div class="header-sub">GETTEL Network</div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="presetSelect">Report Preset</label>
+      <div class="select-wrapper">
+        <select id="presetSelect"></select>
+      </div>
+    </div>
+
+    <button class="btn-apply" id="applyBtn">Apply Filters</button>
+
+    <div class="status" id="statusMsg">
+      <span id="statusText"></span>
+      <div class="status-detail" id="statusDetail"></div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="footer">v1.0 &nbsp;&middot;&nbsp; Multifamily &amp; CRE</div>
+
+  </div>
+
+  <script src="presets.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
