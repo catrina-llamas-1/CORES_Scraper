@@ -157,17 +157,36 @@ async function goToSearchForm(spuId) {
   });
 }
 
+async function waitForBottomChange(prevDoc, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('timeout waiting for search results')), timeoutMs);
+    const check = setInterval(() => {
+      try {
+        const f = getFrame('bottom');
+        if (f && f.document !== prevDoc && f.document.readyState === 'complete') {
+          clearInterval(check); clearTimeout(timeout);
+          setTimeout(() => resolve(f), 500);
+        }
+      } catch(e) {}
+    }, 300);
+  });
+}
+
 // ── SCRAPE ONE COMPANY ───────────────────────────────────────
 async function scrapeOneCompany(searchName, knownCAN) {
   const spuId = getSpuId();
   if (!spuId) throw new Error('Could not detect SPU ID — make sure you are logged in to CORES.');
 
   const searchFrame = await goToSearchForm(spuId);
+  const prevDoc = searchFrame.document;
   searchFrame.document.querySelector('input[name="P_LE_NAME"]').value = searchName;
   searchFrame.document.querySelector('input[name="Z_ACTION"][value="Find"]').click();
+
+  // Wait for the results page to actually finish loading instead of a fixed
+  // delay — a slow load previously got misread as "no match" and skipped.
+  const resultFrame = await waitForBottomChange(prevDoc, CFG.navTimeoutMs);
   await pause(CFG.afterSearch);
 
-  const resultFrame = getFrame('bottom');
   const corrLink = resultFrame.document.querySelector('a[href*="CorrCheck"]');
   if (!corrLink) throw new Error('NO_MATCH');
 
@@ -293,8 +312,17 @@ async function scrapeWithRetry(searchName, knownCAN, label) {
 }
 
 // ── PROGRESS PERSISTENCE ─────────────────────────────────────
+let progressSaveFailed = false;
 function saveProgress(data) {
-  try { localStorage.setItem('cores_progress', JSON.stringify(data)); } catch(e) {}
+  try {
+    localStorage.setItem('cores_progress', JSON.stringify(data));
+  } catch(e) {
+    if (!progressSaveFailed) {
+      progressSaveFailed = true;
+      log(`  WARNING: Could not save progress (${e.message}). Resume-from-progress will not work for the rest of this run — do not close this tab until it finishes.`);
+      updateStatus('WARNING: progress saving failed — keep this tab open!');
+    }
+  }
 }
 
 function loadProgress() {
