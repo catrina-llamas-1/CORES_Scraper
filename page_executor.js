@@ -68,7 +68,7 @@
             );
           }
         } else if (config.type === "select") {
-          $el.val(config.value);
+          $el.val(config.value).trigger("change");
           results.applied.push(fieldName);
         } else if (config.type === "input") {
           $el.val(config.value).trigger("change");

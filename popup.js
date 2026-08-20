@@ -54,36 +54,32 @@ document.addEventListener("DOMContentLoaded", () => {
         world: "MAIN",
       });
 
-      // Step 2: Fire the apply CustomEvent from MAIN world with the filters payload.
+      // Step 2: Register the result listener AND fire the apply CustomEvent in a
+      // single injected call. page_executor.js's handler runs synchronously, so
+      // if the listener were registered in a separate executeScript call *after*
+      // dispatching (as before), the result event would already have fired and
+      // been missed — every apply would falsely report "Timed out".
       const filters = preset.filters;
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: "MAIN",
-        func: (filtersPayload) => {
-          document.dispatchEvent(
-            new CustomEvent("__gettelAutofillApply__", { detail: filtersPayload })
-          );
-        },
-        args: [filters],
-      });
-
-      // Step 3: Read the result back from MAIN world.
       const resultArr = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         world: "MAIN",
-        func: () => {
+        func: (filtersPayload) => {
           return new Promise((resolve) => {
             const handler = (e) => {
               document.removeEventListener("__gettelAutofillResult__", handler);
               resolve(e.detail);
             };
             document.addEventListener("__gettelAutofillResult__", handler);
+            document.dispatchEvent(
+              new CustomEvent("__gettelAutofillApply__", { detail: filtersPayload })
+            );
             setTimeout(() => {
               document.removeEventListener("__gettelAutofillResult__", handler);
               resolve({ applied: [], skipped: ["Timed out waiting for result"] });
             }, 3000);
           });
         },
+        args: [filters],
       });
 
       const results = resultArr?.[0]?.result;
